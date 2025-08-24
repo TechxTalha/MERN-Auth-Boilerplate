@@ -8,6 +8,7 @@ const {
   sendResetSuccessEmail,
   sendVerificationEmail,
 } = require("../services/emailServices");
+const Role = require("../models/rolesModel");
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -19,14 +20,31 @@ const generateToken = (id) => {
 const registerAdmin = asyncHandler(async (req, res) => {
   const { name, email, password, phoneno } = req.body;
 
-  const adminExists = await User.findOne({ email });
-  if (adminExists) {
-    return res.status(400).json({ message: "Email already in use" });
+  // Check if admin already exists by email or phone
+  const existingUser = await User.findOne({
+    $or: [{ email }, { phoneno }],
+  });
+  if (existingUser) {
+    return res
+      .status(400)
+      .json({ message: "Email or phone number already in use" });
   }
 
+  // Fetch the "admin" role from seedRoles
+  let adminRole = await Role.findOne({ name: "admin" });
+  if (!adminRole) {
+    // Safety fallback if seeder hasn't run
+    adminRole = await Role.create({
+      name: "admin",
+      permissions: ["*"], // full system access
+    });
+  }
+
+  // Hash password
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, salt);
 
+  // 👤 Create admin user
   const admin = await User.create({
     name,
     email,
@@ -34,18 +52,23 @@ const registerAdmin = asyncHandler(async (req, res) => {
     phoneno,
     status: "verified",
     type: "admin",
+    roles: [adminRole._id], // assign admin role
   });
 
   if (admin) {
+    // populate roles to return permissions as well
+    const populatedAdmin = await User.findById(admin._id).populate("roles");
+
     res.status(201).json({
       message: "Admin registered successfully",
       admin: {
-        id: admin._id,
-        name: admin.name,
-        email: admin.email,
-        type: admin.type,
-        phoneno: admin.phoneno,
-        status: admin.status,
+        id: populatedAdmin._id,
+        name: populatedAdmin.name,
+        email: populatedAdmin.email,
+        type: populatedAdmin.type,
+        phoneno: populatedAdmin.phoneno,
+        status: populatedAdmin.status,
+        roles: populatedAdmin.roles, // includes permissions array
       },
     });
   } else {
@@ -75,6 +98,28 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 
   await sendVerificationEmail(user);
+
+  /**
+   * ----------------------------------------
+   * Example: Assigning a Default Role to New Users
+   * ----------------------------------------
+   * If you want every new registered user to
+   * automatically get a default role (e.g. "user"),
+   * you can do this during user creation:
+   *
+   * const defaultRole = await Role.findOne({ name: "user" });
+   * if (defaultRole) {
+   *   newUser.roles = [defaultRole._id]; // assign role reference
+   *   await newUser.save();
+   * }
+   *
+   * // This way, the user immediately inherits baseline
+   * // permissions (like ["view_dashboard", "view_profile"])
+   * // as defined in the "user" role from your seed file.
+   *
+   * Note: Make sure your seedRoles.js has already created
+   * the "user" role with the correct permissions.
+   */
 
   res.status(201).json({
     message: "User registered. Please check your email to verify your account.",
