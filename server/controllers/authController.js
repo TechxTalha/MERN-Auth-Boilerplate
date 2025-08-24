@@ -32,6 +32,7 @@ const registerAdmin = asyncHandler(async (req, res) => {
     email,
     password: hashedPassword,
     phoneno,
+    status: "verified",
     type: "admin",
   });
 
@@ -44,6 +45,7 @@ const registerAdmin = asyncHandler(async (req, res) => {
         email: admin.email,
         type: admin.type,
         phoneno: admin.phoneno,
+        status: admin.status,
       },
     });
   } else {
@@ -114,6 +116,11 @@ const login = asyncHandler(async (req, res) => {
 
   if (!user) {
     return res.status(400).json({ message: "Invalid email or password" });
+  }
+
+  // Check if user is verified
+  if (user.status !== "verified") {
+    return res.status(400).json({ message: "Email not verified" });
   }
 
   // Check if password matches
