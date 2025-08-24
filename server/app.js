@@ -6,6 +6,7 @@ const cors = require("cors");
 const bodyparser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const errorHandler = require("./middlewares/errorMiddleware");
+const seedRoles = require("./utils/seedRoles");
 require("dotenv").config();
 //app
 const app = express();
@@ -18,7 +19,10 @@ mongoose
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => console.log("DB CONNECTED"))
+  .then(async () => {
+    console.log("DB CONNECTED");
+    await seedRoles();
+  })
   .catch((err) => console.log("DB CONNECTECTION ERROR", err));
 
 //middleware
