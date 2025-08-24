@@ -10,9 +10,10 @@ const VerifyEmail = () => {
   const { token } = useParams();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState(null);
+  const [flag, setFlag] = useState(false);
 
   useEffect(() => {
-    if (token) verify();
+    if (token && status !== "success") verify();
   }, []);
 
   const verify = async () => {
@@ -21,7 +22,7 @@ const VerifyEmail = () => {
       if (res.status === 200) {
         message.success(res.data.message || "Email verified successfully!");
         setStatus("success");
-        setTimeout(() => navigate("/login"), 3000);
+        navigate("/login");
       } else {
         message.error(res.data.message || "Verification failed!");
         setStatus("error");
